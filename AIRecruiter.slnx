@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="AIRecruiter.API/AIRecruiter.API.csproj" />
+  <Project Path="AIRecruiter.Core/AIRecruiter.Core.csproj" />
+  <Project Path="AIRecruiter.Infrastructure/AIRecruiter.Infrastructure.csproj" />
+</Solution>
