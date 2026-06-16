@@ -1,11 +1,13 @@
 ﻿using AIRecruiter.Core.DTOs;
 using AIRecruiter.Core.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AIRecruiter.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public sealed class JobDescriptionsController : ControllerBase
 {
     private readonly IJobDescriptionRepository _jobDescriptionRepo;

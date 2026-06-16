@@ -1,12 +1,14 @@
 ﻿using AIRecruiter.Core.DTOs;
 using AIRecruiter.Core.Interfaces;
 using AIRecruiter.Infrastructure.Repositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AIRecruiter.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public sealed class CandidatesController : ControllerBase
 {
     private readonly ICandidateRepository _candidateRepo;
@@ -30,6 +32,7 @@ public sealed class CandidatesController : ControllerBase
     }
 
     [HttpPost("upload")]
+    [AllowAnonymous]
     public async Task<IActionResult> UploadCV(
         [FromForm] string fullName,
         [FromForm] string email,
