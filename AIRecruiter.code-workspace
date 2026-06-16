@@ -1,0 +1,23 @@
+﻿{
+  "folders": [
+    {
+      "name": "Web (React)",
+      "path": "AIRecruiter.Web"
+    },
+    {
+      "name": "API (.NET)",
+      "path": "AIRecruiter.API"
+    },
+    {
+      "name": "Infrastructure",
+      "path": "AIRecruiter.Infrastructure"
+    },
+    {
+      "name": "Core",
+      "path": "AIRecruiter.Core"
+    }
+  ],
+  "settings": {
+    "git.detectSubmodules": false
+  }
+}
