@@ -2,53 +2,48 @@
 using System.Text.Json;
 using AIRecruiter.Core.DTOs;
 using AIRecruiter.Core.Interfaces;
-using Microsoft.Extensions.Configuration;
+using AIRecruiter.Infrastructure.Prompts;
+using Microsoft.Extensions.Logging;
 
 namespace AIRecruiter.Infrastructure.Services;
 
 public class AIService : IAIService
 {
     private readonly HttpClient _httpClient;
+    private readonly ILogger<AIService> _logger;
     private const string Model = "llama-3.3-70b-versatile";
 
-    public AIService(HttpClient httpClient)
+    public AIService(HttpClient httpClient, ILogger<AIService> logger)
     {
         _httpClient = httpClient;
+        _logger = logger;
     }
 
     public async Task<CandidateAnalysis> AnalyzeCVAsync(string cvContent, string jobDescription)
     {
-        string prompt = "You are a professional AI recruiter. Analyze the CV below and compare it with the Job Description.\n\n"
-            + "JOB DESCRIPTION:\n" + jobDescription + "\n\n"
-            + "CV:\n" + cvContent + "\n\n"
-            + "Reply ONLY in the following JSON format, no extra text, no markdown:\n"
-            + "{\n"
-            + "  \"matchScore\": <0-100>,\n"
-            + "  \"summary\": \"<2-3 sentence summary>\",\n"
-            + "  \"strengths\": \"<strengths separated by |>\",\n"
-            + "  \"weaknesses\": \"<weaknesses separated by |>\",\n"
-            + "  \"redFlags\": \"<red flags if any, separated by |>\"\n"
-            + "}";
-
+        string prompt = PromptTemplates.AnalyzeCV(cvContent, jobDescription);
         string json = await CallGroqAsync(prompt);
-        Console.WriteLine($"[AI] Analysis response: {json}");
+        _logger.LogDebug("[AI] Analysis response: {Json}", json);
         return ParseAnalysisJson(json);
     }
 
     public async Task<List<string>> GenerateInterviewQuestionsAsync(string cvContent, string jobDescription)
     {
-        string prompt = "Based on the CV and Job Description below, generate 5 interview questions.\n"
-            + "Mix technical and behavioral questions.\n\n"
-            + "JOB DESCRIPTION:\n" + jobDescription + "\n\n"
-            + "CV:\n" + cvContent + "\n\n"
-            + "Reply ONLY in the following JSON format, no extra text, no markdown:\n"
-            + "{\n"
-            + "  \"questions\": [\"question 1\", \"question 2\", \"question 3\", \"question 4\", \"question 5\"]\n"
-            + "}";
-
+        string prompt = PromptTemplates.GenerateInterviewQuestions(cvContent, jobDescription);
         string json = await CallGroqAsync(prompt);
-        Console.WriteLine($"[AI] Questions response: {json}");
+        _logger.LogDebug("[AI] Questions response: {Json}", json);
         return ParseQuestionsJson(json);
+    }
+
+    public async Task<ClassifyResult> ExtractAndClassifyAsync(string cvContent, List<JobDescriptionDto> jobs)
+    {
+        string jobList = string.Join("\n", jobs.Select((j, i) =>
+            $"JD_{i + 1} (Id={j.Id}): {j.Title} | Skills: {j.RequiredSkills} | Experience: {j.YearsOfExperience}+ years"));
+
+        string prompt = PromptTemplates.ExtractAndClassify(cvContent, jobList);
+        string json = await CallGroqAsync(prompt);
+        _logger.LogDebug("[AI] Classify response: {Json}", json);
+        return ParseClassifyResult(json);
     }
 
     private async Task<string> CallGroqAsync(string prompt)
@@ -56,23 +51,19 @@ public class AIService : IAIService
         var requestBody = new
         {
             model = Model,
-            messages = new[]
-            {
-                new { role = "user", content = prompt }
-            },
+            messages = new[] { new { role = "user", content = prompt } },
             temperature = 0.3,
-            max_tokens = 1024
+            max_tokens = 2048
         };
 
-        var content = new StringContent(
-            JsonSerializer.Serialize(requestBody),
-            Encoding.UTF8,
-            "application/json");
-
+        var content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
         var response = await _httpClient.PostAsync("openai/v1/chat/completions", content);
         var body = await response.Content.ReadAsStringAsync();
 
-        Console.WriteLine($"[AI] Raw response: {body[..Math.Min(300, body.Length)]}");
+        _logger.LogDebug("[AI] Raw response: {Body}", body[..Math.Min(300, body.Length)]);
+
+        if (!response.IsSuccessStatusCode)
+            throw new Exception($"Groq API error {response.StatusCode}: {body}");
 
         using JsonDocument doc = JsonDocument.Parse(body);
         string text = doc.RootElement
@@ -84,7 +75,7 @@ public class AIService : IAIService
         return text.Replace("```json", "").Replace("```", "").Trim();
     }
 
-    private static CandidateAnalysis ParseAnalysisJson(string json)
+    private CandidateAnalysis ParseAnalysisJson(string json)
     {
         try
         {
@@ -102,12 +93,12 @@ public class AIService : IAIService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[AI] Parse error: {ex.Message}");
+            _logger.LogError(ex, "[AI] ParseAnalysisJson error");
             return new CandidateAnalysis { MatchScore = 0, Summary = "Unable to analyze CV." };
         }
     }
 
-    private static List<string> ParseQuestionsJson(string json)
+    private List<string> ParseQuestionsJson(string json)
     {
         try
         {
@@ -120,8 +111,45 @@ public class AIService : IAIService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[AI] Parse questions error: {ex.Message}");
+            _logger.LogError(ex, "[AI] ParseQuestionsJson error");
             return ["Unable to generate questions."];
+        }
+    }
+
+    private ClassifyResult ParseClassifyResult(string json)
+    {
+        try
+        {
+            using JsonDocument doc = JsonDocument.Parse(json);
+            JsonElement root = doc.RootElement;
+            JsonElement info = root.GetProperty("candidateInfo");
+
+            return new ClassifyResult
+            {
+                CandidateInfo = new ExtractedCandidateInfo
+                {
+                    Name = info.GetProperty("name").GetString() ?? string.Empty,
+                    Email = info.GetProperty("email").GetString() ?? string.Empty,
+                    Skills = info.GetProperty("skills").GetString() ?? string.Empty,
+                    YearsOfExp = info.GetProperty("yearsOfExp").GetInt32(),
+                    Summary = info.GetProperty("summary").GetString() ?? string.Empty,
+                },
+                BestMatchJobId = Guid.Parse(root.GetProperty("bestMatchJobId").GetString() ?? Guid.Empty.ToString()),
+                MatchScore = root.GetProperty("matchScore").GetInt32(),
+                MatchSummary = root.GetProperty("matchSummary").GetString() ?? string.Empty,
+                Strengths = root.GetProperty("strengths").GetString() ?? string.Empty,
+                Weaknesses = root.GetProperty("weaknesses").GetString() ?? string.Empty,
+                RedFlags = root.GetProperty("redFlags").GetString() ?? string.Empty,
+                Questions = root.GetProperty("questions")
+                                     .EnumerateArray()
+                                     .Select(q => q.GetString() ?? string.Empty)
+                                     .ToList(),
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[AI] ParseClassifyResult error");
+            return new ClassifyResult();
         }
     }
 }

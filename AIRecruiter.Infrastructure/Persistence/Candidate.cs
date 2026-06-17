@@ -31,7 +31,19 @@ public partial class Candidate
 
     public DateTime CreatedAt { get; set; }
 
-    public Guid JobDescriptionId { get; set; }
+    public Guid? JobDescriptionId { get; set; }
 
-    public virtual JobDescription JobDescription { get; set; } = null!;
+    public string? ExtractedName { get; set; }
+
+    public string? ExtractedEmail { get; set; }
+
+    public string? ExtractedSkills { get; set; }
+
+    public int? ExtractedExperience { get; set; }
+
+    public bool AutoAssigned { get; set; }
+
+    public string? OriginalFileName { get; set; }
+
+    public virtual JobDescription? JobDescription { get; set; }
 }

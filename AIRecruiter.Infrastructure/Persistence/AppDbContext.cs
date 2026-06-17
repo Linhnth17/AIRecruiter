@@ -32,6 +32,7 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.Id)
                 .HasDefaultValueSql("gen_random_uuid()")
                 .HasColumnName("id");
+            entity.Property(e => e.AutoAssigned).HasColumnName("auto_assigned");
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("now()")
                 .HasColumnType("timestamp without time zone")
@@ -43,6 +44,14 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.Email)
                 .HasMaxLength(200)
                 .HasColumnName("email");
+            entity.Property(e => e.ExtractedEmail)
+                .HasMaxLength(200)
+                .HasColumnName("extracted_email");
+            entity.Property(e => e.ExtractedExperience).HasColumnName("extracted_experience");
+            entity.Property(e => e.ExtractedName)
+                .HasMaxLength(200)
+                .HasColumnName("extracted_name");
+            entity.Property(e => e.ExtractedSkills).HasColumnName("extracted_skills");
             entity.Property(e => e.FullName)
                 .HasMaxLength(200)
                 .HasColumnName("full_name");
@@ -51,6 +60,9 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.MatchSummary)
                 .HasDefaultValueSql("''::text")
                 .HasColumnName("match_summary");
+            entity.Property(e => e.OriginalFileName)
+                .HasMaxLength(500)
+                .HasColumnName("original_file_name");
             entity.Property(e => e.RedFlags)
                 .HasDefaultValueSql("''::text")
                 .HasColumnName("red_flags");
@@ -70,6 +82,7 @@ public partial class AppDbContext : DbContext
 
             entity.HasOne(d => d.JobDescription).WithMany(p => p.Candidates)
                 .HasForeignKey(d => d.JobDescriptionId)
+                .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("fk_job_description");
         });
 

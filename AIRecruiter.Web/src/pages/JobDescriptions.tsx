@@ -1,18 +1,19 @@
 import { useNavigate } from 'react-router-dom';
+import { useJobs } from '../hooks/useJobs';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import EmptyState from '../components/ui/EmptyState';
-import { useJobs } from '../hooks/useJobs';
 import { colors, spacing } from '../styles/tokens';
 import { formatDate, truncate, parseSkills } from '../utils/format';
+import { Briefcase, Plus } from 'lucide-react';
 
 export default function JobDescriptions() {
-  const navigate       = useNavigate();
+  const navigate          = useNavigate();
   const { jobs, loading } = useJobs();
 
   if (loading) return (
-    <EmptyState icon="⏳" title="Loading jobs..." />
+    <EmptyState icon={<Briefcase size={48} color={colors.text.muted} />} title="Loading jobs..." />
   );
 
   return (
@@ -24,13 +25,15 @@ export default function JobDescriptions() {
           </h1>
           <p style={{ color: colors.text.muted, fontSize: 14 }}>{jobs.length} open positions</p>
         </div>
-        <Button onClick={() => navigate('/create')}>+ New Job Description</Button>
+        <Button onClick={() => navigate('/create')}>
+          <Plus size={16} /> New Job Description
+        </Button>
       </div>
 
       {jobs.length === 0 && (
         <Card>
           <EmptyState
-            icon="📋"
+            icon={<Briefcase size={48} color={colors.text.muted} />}
             title="No job descriptions yet"
             description="Create your first job description to start receiving applications"
             action={<Button onClick={() => navigate('/create')}>Create Job Description</Button>}
@@ -40,7 +43,7 @@ export default function JobDescriptions() {
 
       <div style={{ display: 'grid', gap: spacing.md, gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
         {jobs.map(job => (
-          <Card key={job.id} hoverable onClick={() => navigate(`/jobs/${job.id}`)}>
+          <Card key={job.id} hoverable>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
               <h3 style={{ fontSize: 17, fontWeight: 600, color: colors.text.primary }}>{job.title}</h3>
               <Badge label={`${job.yearsOfExperience}+ yrs`} variant="primary" />
@@ -63,7 +66,15 @@ export default function JobDescriptions() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: colors.text.muted, fontSize: 12 }}>{formatDate(job.createdAt)}</span>
-              <span style={{ color: colors.primary, fontSize: 13, fontWeight: 500 }}>View candidates →</span>
+
+              {/* View Candidates button */}
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => navigate(`/candidates?jobId=${job.id}`)}
+              >
+                View Candidates →
+              </Button>
             </div>
           </Card>
         ))}
